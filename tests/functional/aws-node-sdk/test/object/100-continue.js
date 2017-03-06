@@ -44,8 +44,12 @@ class ContinueRequestHandler {
             assert.strictEqual(res.statusCode, statusCode);
             return cb();
         });
-        // Send the body since the continue event has been emitted.
-        req.on('continue', () => req.end(body));
+        // Send the body either on the continue event, or immediately.
+        if (this.expectHeader === '100-continue') {
+            req.on('continue', () => req.end(body));
+        } else {
+            req.end(body);
+        }
     }
 
     sendsBodyOnContinue(cb) {
@@ -101,14 +105,13 @@ describe('PUT public object with 100-continue header', () => {
             ContinueRequest.setExpectHeader('100-CONTINUE')
                 .hasStatusCode(200, done));
 
+        it('should return 200 status code if incorrect value', done =>
+            ContinueRequest.setExpectHeader('101-continue')
+                .hasStatusCode(200, done));
+
         it('should return 403 status code if cannot authenticate', done =>
             ContinueRequest.setRequestPath(invalidSignedURL)
                 .hasStatusCode(403, done));
-
-        // TODO: Do not skip this test when upgraded to post Node v5.5
-        it.skip('should return 417 status code if incorrect value', done =>
-            ContinueRequest.setExpectHeader('101-continue')
-                .hasStatusCode(417, done));
 
         it('should wait for continue event before sending body', done =>
             ContinueRequest.sendsBodyOnContinue(done));
