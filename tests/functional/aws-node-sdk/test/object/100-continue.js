@@ -78,7 +78,7 @@ describe('PUT public object with 100-continue header', () => {
     withV4(sigCfg => {
         let bucketUtil;
         let s3;
-        let ContinueRequest;
+        let continueRequest;
         const invalidSignedURL = `/${bucket}/${key}`;
 
         beforeEach(() => {
@@ -90,7 +90,7 @@ describe('PUT public object with 100-continue header', () => {
             };
             const signedUrl = s3.getSignedUrl('putObject', params);
             const { path } = url.parse(signedUrl);
-            ContinueRequest = new ContinueRequestHandler(path);
+            continueRequest = new ContinueRequestHandler(path);
             return s3.createBucketAsync({ Bucket: bucket });
         });
 
@@ -99,25 +99,25 @@ describe('PUT public object with 100-continue header', () => {
             .then(() => bucketUtil.deleteOne(bucket)));
 
         it('should return 200 status code', done =>
-            ContinueRequest.hasStatusCode(200, done));
+            continueRequest.hasStatusCode(200, done));
 
         it('should return 200 status code with upper case value', done =>
-            ContinueRequest.setExpectHeader('100-CONTINUE')
+            continueRequest.setExpectHeader('100-CONTINUE')
                 .hasStatusCode(200, done));
 
         it('should return 200 status code if incorrect value', done =>
-            ContinueRequest.setExpectHeader('101-continue')
+            continueRequest.setExpectHeader('101-continue')
                 .hasStatusCode(200, done));
 
         it('should return 403 status code if cannot authenticate', done =>
-            ContinueRequest.setRequestPath(invalidSignedURL)
+            continueRequest.setRequestPath(invalidSignedURL)
                 .hasStatusCode(403, done));
 
         it('should wait for continue event before sending body', done =>
-            ContinueRequest.sendsBodyOnContinue(done));
+            continueRequest.sendsBodyOnContinue(done));
 
         it('should continue if a public user', done =>
-            ContinueRequest.setRequestPath(invalidSignedURL)
+            continueRequest.setRequestPath(invalidSignedURL)
                 .sendsBodyOnContinue(done));
     });
 });
