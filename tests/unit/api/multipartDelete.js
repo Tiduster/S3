@@ -24,7 +24,11 @@ const bucketPutRequest = {
     namespace,
     headers: { host: `${bucketName}.s3.amazonaws.com` },
     url: '/',
-    post: '',
+    post: '<?xml version="1.0" encoding="UTF-8"?>' +
+        '<CreateBucketConfiguration ' +
+        'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
+        '<LocationConstraint>us-east-1</LocationConstraint>' +
+        '</CreateBucketConfiguration>',
 };
 const objectKey = 'testObject';
 const initiateRequest = {
@@ -36,12 +40,10 @@ const initiateRequest = {
 };
 const originalUsEastBehavior = config.usEastBehavior;
 
-function _createAndAbortMpu(usEastSetting, fakeUploadID, locationConstraint,
-    callback) {
+function _createAndAbortMpu(usEastSetting, fakeUploadID, callback) {
     config.usEastBehavior = usEastSetting;
     async.waterfall([
-        next => bucketPut(authInfo, bucketPutRequest, locationConstraint, log,
-            next),
+        next => bucketPut(authInfo, bucketPutRequest, log, next),
         (corsHeaders, next) =>
             initiateMultipartUpload(authInfo, initiateRequest, log, next),
         (result, corsHeaders, next) => parseString(result, next),
@@ -97,15 +99,7 @@ describe('Multipart Delete API', () => {
 
     it('should not return error if mpu exists with uploadId and at least ' +
     'one part', done => {
-        _createAndAbortMpu(true, false, 'us-east-1', err => {
-            assert.strictEqual(err, null, `Expected no error, got ${err}`);
-            done(err);
-        });
-    });
-
-    it('should still not return error if uploadId does not exist on ' +
-    'multipart abort call, in region other than us-east-1', done => {
-        _createAndAbortMpu(true, true, 'us-west-1', err => {
+        _createAndAbortMpu(true, false, err => {
             assert.strictEqual(err, null, `Expected no error, got ${err}`);
             done(err);
         });
@@ -114,7 +108,7 @@ describe('Multipart Delete API', () => {
     it('bucket created in us-east-1: should return 404 if uploadId does not ' +
     'exist and usEastBehavior set to true',
     done => {
-        _createAndAbortMpu(true, true, 'us-east-1', err => {
+        _createAndAbortMpu(true, true, err => {
             assert.strictEqual(err, errors.NoSuchUpload,
                 `Expected NoSuchUpload, got ${err}`);
             done();
@@ -123,9 +117,22 @@ describe('Multipart Delete API', () => {
 
     it('bucket created in us-east-1: should return no error if uploadId ' +
     'does not exist and usEastBehavior set to false', done => {
-        _createAndAbortMpu(false, true, 'us-east-1', err => {
+        _createAndAbortMpu(false, true, err => {
             assert.strictEqual(err, null, `Expected no error, got ${err}`);
             done();
+        });
+    });
+
+    it('should still not return error if uploadId does not exist on ' +
+    'multipart abort call, in region other than us-east-1', done => {
+        bucketPutRequest.post = '<?xml version="1.0" encoding="UTF-8"?>' +
+            '<CreateBucketConfiguration ' +
+            'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
+            '<LocationConstraint>us-west-1</LocationConstraint>' +
+            '</CreateBucketConfiguration>';
+        _createAndAbortMpu(true, true, err => {
+            assert.strictEqual(err, null, `Expected no error, got ${err}`);
+            done(err);
         });
     });
 });
