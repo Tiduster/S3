@@ -1,10 +1,16 @@
 import assert from 'assert';
 import http from 'http';
+import https from 'https';
 import url from 'url';
 
 import withV4 from '../support/withV4';
 import BucketUtility from '../../lib/utility/bucket-util';
+import conf from '../../../../../lib/Config';
 
+const transport = conf.https ? https : http;
+const ipAddress = process.env.IP ? process.env.IP : 'localhost';
+const hostname = process.env.AWS_ON_AIR ? 's3.amazonaws.com' : ipAddress;
+const port = process.env.AWS_ON_AIR ? 80 : 8000;
 const bucket = 'foo-bucket';
 const key = 'foo-key';
 const body = Buffer.alloc(1024 * 1024);
@@ -28,8 +34,8 @@ class ContinueRequestHandler {
     getRequestOptions() {
         return {
             path: this.path,
-            hostname: 'localhost',
-            port: 8000,
+            hostname,
+            port,
             method: 'PUT',
             headers: {
                 'content-length': body.length,
@@ -40,7 +46,7 @@ class ContinueRequestHandler {
 
     hasStatusCode(statusCode, cb) {
         const options = this.getRequestOptions();
-        const req = http.request(options, res => {
+        const req = transport.request(options, res => {
             assert.strictEqual(res.statusCode, statusCode);
             return cb();
         });
@@ -54,7 +60,7 @@ class ContinueRequestHandler {
 
     sendsBodyOnContinue(cb) {
         const options = this.getRequestOptions();
-        const req = http.request(options);
+        const req = transport.request(options);
         // At this point we have only sent the header.
         assert(req.output.length === 1);
         const headerLen = req.output[0].length;
