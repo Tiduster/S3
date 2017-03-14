@@ -46,6 +46,7 @@ class ContinueRequestHandler {
 
     hasStatusCode(statusCode, cb) {
         const options = this.getRequestOptions();
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const req = transport.request(options, res => {
             assert.strictEqual(res.statusCode, statusCode);
             return cb();
@@ -60,6 +61,7 @@ class ContinueRequestHandler {
 
     sendsBodyOnContinue(cb) {
         const options = this.getRequestOptions();
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const req = transport.request(options);
         // At this point we have only sent the header.
         assert(req.output.length === 1);
