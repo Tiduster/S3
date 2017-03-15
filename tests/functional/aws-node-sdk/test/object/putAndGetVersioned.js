@@ -4,12 +4,14 @@ import async from 'async';
 
 import getConfig from '../support/config';
 
-const bucket = `versioning-bucket-${Date.now()}`;
-const key = '/';
 const versioningEnabled = { Status: 'Enabled' };
 const versioningSuspended = { Status: 'Suspended' };
 const config = getConfig('default', { signatureVersion: 'v4' });
 const s3 = new S3(config);
+const data = ['foo1', 'foo2'];
+const counter = 10;
+let bucket;
+const key = '/';
 
 function _assertNoError(err, desc) {
     assert.strictEqual(err, null, `Unexpected err ${desc}: ${err}`);
@@ -31,40 +33,33 @@ function _removeAllVersions(bucket, callback) {
     return s3.listObjectVersions({ Bucket: bucket }, (err, data) => {
         // console.log('list object versions before deletion', data);
         if (err) {
-            callback(err);
+            return callback(err);
         }
         return _deleteVersionList(data.DeleteMarkers, bucket, err => {
             if (err) {
-                callback(err);
+                return callback(err);
             }
-            _deleteVersionList(data.Versions, bucket, callback);
+            return _deleteVersionList(data.Versions, bucket, callback);
         });
     });
 }
 
-describe('aws-node-sdk test object versioning', function testSuite() {
+describe('put and get object with versioning', function testSuite() {
     this.timeout(600000);
-    const counter = 100;
 
-    before(done => {
+    beforeEach(done => {
+        bucket = `versioning-bucket-${Date.now()}`;
         s3.createBucket({ Bucket: bucket }, done);
     });
 
     afterEach(done => {
-        // TODO: remove conditional after listing is implemented
-        if (process.env.AWS_ON_AIR) {
-            return _removeAllVersions(bucket, err => {
-                if (err) {
-                    return done(err);
-                }
-                return s3.deleteBucket({ Bucket: bucket }, err => {
-                    assert.strictEqual(err, null,
-                        `Error deleting bucket: ${err}`);
-                    return done();
-                });
-            });
-        }
-        return done();
+        _removeAllVersions(bucket, err => {
+            if (err) {
+                return done(err);
+            }
+            // console.log('about to delete bucket');
+            return s3.deleteBucket({ Bucket: bucket }, done);
+        });
     });
 
     it('should create a non-versioned object', done => {
@@ -104,7 +99,6 @@ describe('aws-node-sdk test object versioning', function testSuite() {
     });
 
     describe('on a version-enabled bucket with non-versioned object', () => {
-        const data = ['foo1', 'foo2'];
         const eTags = [];
 
         beforeEach(done => {
@@ -203,11 +197,46 @@ describe('aws-node-sdk test object versioning', function testSuite() {
                 });
             });
         });
+
+        it('should update null version if put object twice', done => {
+            const params = { Bucket: bucket, Key: key };
+            const params1 = { Bucket: bucket, Key: key, Body: data[0] };
+            const params2 = { Bucket: bucket, Key: key, Body: data[1] };
+            const paramsNull = { Bucket: bucket, Key: key, VersionId: 'null' };
+            const eTags = [];
+            async.waterfall([
+                callback => s3.putObject(params1, (err, data) => {
+                    _assertNoError(err, 'putting first object');
+                    assert.strictEqual(data.VersionId, undefined);
+                    eTags.push(data.ETag);
+                    callback();
+                }),
+                callback => s3.getObject(params, (err, data) => {
+                    _assertNoError(err, 'getting master version');
+                    assert.strictEqual(data.VersionId, 'null');
+                    assert.strictEqual(data.ETag, eTags[0],
+                        'wrong object data');
+                    callback();
+                }),
+                callback => s3.putObject(params2, (err, data) => {
+                    _assertNoError(err, 'putting second object');
+                    assert.strictEqual(data.VersionId, undefined);
+                    eTags.push(data.ETag);
+                    callback();
+                }),
+                callback => s3.getObject(paramsNull, (err, data) => {
+                    _assertNoError(err, 'getting null version');
+                    assert.strictEqual(data.VersionId, 'null');
+                    assert.strictEqual(data.ETag, eTags[1],
+                        'wrong object data');
+                    callback();
+                }),
+            ], done);
+        });
     });
 
     describe('on a version-suspended bucket with non-versioned object', () => {
         const eTags = [];
-        const data = ['test'];
 
         beforeEach(done => {
             s3.putObject({ Bucket: bucket, Key: key, Body: data[0] },
@@ -223,6 +252,12 @@ describe('aws-node-sdk test object versioning', function testSuite() {
                 });
         });
 
+        afterEach(done => {
+            // reset eTags
+            eTags.length = 0;
+            done();
+        });
+
         it('should get null version in versioning suspended bucket',
         done => {
             const paramsNull = { Bucket: bucket, Key: '/', VersionId: 'null' };
@@ -234,29 +269,30 @@ describe('aws-node-sdk test object versioning', function testSuite() {
 
         it('should update null version in versioning suspended bucket',
         done => {
-            const params = { Bucket: bucket, Key: '/' };
-            const paramsNull = { Bucket: bucket, Key: '/', VersionId: 'null' };
+            const params = { Bucket: bucket, Key: key };
+            const putParams = { Bucket: bucket, Key: '/', Body: data[1] };
+            const paramsNull = { Bucket: bucket, Key: key, VersionId: 'null' };
             async.waterfall([
                 callback => s3.getObject(paramsNull, (err, data) => {
-                    assert.strictEqual(data.VersionId, 'null');
                     _assertNoError(err, 'getting null version');
+                    assert.strictEqual(data.VersionId, 'null');
                     callback();
                 }),
-                callback => s3.putObject(params, (err, data) => {
+                callback => s3.putObject(putParams, (err, data) => {
                     _assertNoError(err, 'putting object');
                     assert.strictEqual(data.VersionId, undefined);
                     eTags.push(data.ETag);
                     callback();
                 }),
                 callback => s3.getObject(paramsNull, (err, data) => {
-                    assert.strictEqual(err, null);
+                    _assertNoError(err, 'getting null version');
                     assert.strictEqual(data.VersionId, 'null');
                     assert.strictEqual(data.ETag, eTags[1],
                         'wrong object data');
                     callback();
                 }),
                 callback => s3.getObject(params, (err, data) => {
-                    assert.strictEqual(err, null);
+                    _assertNoError(err, 'getting master version');
                     assert.strictEqual(data.VersionId, 'null');
                     assert.strictEqual(data.ETag, eTags[1],
                         'wrong object data');
@@ -266,60 +302,83 @@ describe('aws-node-sdk test object versioning', function testSuite() {
         });
     });
 
-    /* it('should enable versioning and preserve the null version', done => {
-        const paramsVersioning = {
-            Bucket: bucket,
-            VersioningConfiguration: {
-                Status: 'Enabled',
-            },
-        };
-        const params = { Bucket: bucket, Key: '/' };
-        const paramsNull = { Bucket: bucket, Key: '/', VersionId: 'null' };
-        let nullVersionId = undefined;
-        async.waterfall([
-            callback => s3.getObject(paramsNull, (err, data) => {
-                assert.strictEqual(err, null);
-                nullVersionId = data.VersionId;
-                callback();
-            }),
-            callback => s3.putBucketVersioning(paramsVersioning,
-                err => callback(err)),
-            callback => async.timesSeries(counter, (i, next) =>
-                s3.putObject(params, (err, data) => {
-                    assert.strictEqual(err, null);
-                    versionIds.push(data.VersionId);
-                    next();
-                }), err => callback(err)),
-            callback => s3.getObject(paramsNull, (err, data) => {
-                assert.strictEqual(err, null);
-                assert.strictEqual(nullVersionId, data.VersionId,
-                        'version ids are not equal');
-                callback();
-            }),
-        ], done);
-    }); */
+    describe('on versioning suspended then enabled bucket with null version',
+    () => {
+        const eTags = [];
+        beforeEach(done => {
+            const params = { Bucket: bucket, Key: key, Body: data[0] };
+            async.waterfall([
+                callback => s3.putBucketVersioning({
+                    Bucket: bucket,
+                    VersioningConfiguration: versioningSuspended,
+                }, err => callback(err)),
+                callback => s3.putObject(params, (err, data) => {
+                    if (err) {
+                        callback(err);
+                    }
+                    eTags.push(data.ETag);
+                    callback();
+                }),
+                callback => s3.putBucketVersioning({
+                    Bucket: bucket,
+                    VersioningConfiguration: versioningEnabled,
+                }, callback),
+            ], done);
+        });
 
-    /* it('should create a bunch of objects and their versions', done => {
-        const vids = [];
-        const keycount = 50;
-        const versioncount = 20;
-        const value = '{"foo":"bar"}';
-        async.times(keycount, (i, next1) => {
-            const key = `foo${i}`;
-            const params = { Bucket: bucket, Key: key, Body: value };
-            async.times(versioncount, (j, next2) =>
-                s3.putObject(params, (err, data) => {
-                    assert.strictEqual(err, null);
-                    assert(data.VersionId, 'invalid versionId');
-                    vids.push({ Key: key, VersionId: data.VersionId });
-                    next2();
-                }), next1);
-        }, err => {
-            assert.strictEqual(err, null);
-            assert.strictEqual(vids.length, keycount * versioncount);
-            // TODO use delete marker and check with the result
-            process.stdout.write('creating objects done, now deleting...');
+        afterEach(done => {
+            // reset eTags
+            eTags.length = 0;
             done();
         });
-    }); */
+
+        it('should preserve the null version when creating new versions',
+        done => {
+            const params = { Bucket: bucket, Key: key };
+            const paramsNull = { Bucket: bucket, Key: key, VersionId: 'null' };
+            async.waterfall([
+                callback => s3.getObject(paramsNull, (err, nullVerData) => {
+                    _assertNoError(err, 'getting null version');
+                    assert.strictEqual(nullVerData.ETag, eTags[0]);
+                    assert.strictEqual(nullVerData.VersionId, 'null');
+                    callback();
+                }),
+                callback => async.timesSeries(counter, (i, next) =>
+                    s3.putObject(params, (err, data) => {
+                        _assertNoError(err, `putting object #${i}`);
+                        assert.notEqual(data.VersionId, undefined);
+                        next();
+                    }), err => callback(err)),
+                callback => s3.getObject(paramsNull, (err, nullVerData) => {
+                    _assertNoError(err, 'getting null version');
+                    assert.strictEqual(nullVerData.ETag, eTags[0]);
+                    callback();
+                }),
+            ], done);
+        });
+
+        it('should create a bunch of objects and their versions', done => {
+            const vids = [];
+            const keycount = 50;
+            const versioncount = 20;
+            const value = '{"foo":"bar"}';
+            async.times(keycount, (i, next1) => {
+                const key = `foo${i}`;
+                const params = { Bucket: bucket, Key: key, Body: value };
+                async.times(versioncount, (j, next2) =>
+                    s3.putObject(params, (err, data) => {
+                        assert.strictEqual(err, null);
+                        assert(data.VersionId, 'invalid versionId');
+                        vids.push({ Key: key, VersionId: data.VersionId });
+                        next2();
+                    }), next1);
+            }, err => {
+                assert.strictEqual(err, null);
+                assert.strictEqual(vids.length, keycount * versioncount);
+                // TODO use delete marker and check with the result
+                process.stdout.write('creating objects done, now deleting...');
+                done();
+            });
+        });
+    });
 });
