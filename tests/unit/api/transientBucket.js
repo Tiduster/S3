@@ -382,6 +382,14 @@ describe('transient bucket handling', () => {
         const uploadId = '5555';
         deleteRequest.objectKey = 'objectName';
         deleteRequest.query = { uploadId };
+        const originalLegacyAWSBehavior =
+            config.locationConstraints[locationConstraint].legacyAwsBehavior;
+
+        after(done => {
+            config.locationConstraints[locationConstraint].legacyAwsBehavior =
+                originalLegacyAWSBehavior;
+            done();
+        });
 
         it('should return NoSuchUpload error if legacyAwsBehavior is enabled',
         done => {
