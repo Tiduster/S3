@@ -10,7 +10,7 @@ const correctMD5 = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
 
 let bucketUtil;
 let s3;
-
+const itSkipIfE2E = process.env.S3_END_TO_END ? it.skip : it;
 
 describe('MultipleBackend put object', () => {
     withV4(sigCfg => {
@@ -63,7 +63,8 @@ describe('MultipleBackend put object', () => {
                 });
             });
 
-            it('should put an object to mem', done => {
+            // SKIP because not mem location constraint in E2E.
+            itSkipIfE2E('should put an object to mem', done => {
                 const params = { Bucket: bucket, Key: key,
                     Body: body,
                     Metadata: { 'scal-location-constraint': 'mem' },
@@ -95,7 +96,7 @@ describe('MultipleBackend put object', () => {
                 });
             });
 
-            it('should put an object to file', done => {
+            itSkipIfE2E('should put an object to file', done => {
                 const params = { Bucket: bucket, Key: key,
                     Body: body,
                     Metadata: { 'scal-location-constraint': 'file' },
@@ -115,8 +116,7 @@ describe('MultipleBackend put object', () => {
     });
 });
 
-describe('MultipleBackend put object based on bucket ' +
-'location', () => {
+describe('MultipleBackend put object based on bucket location', () => {
     withV4(sigCfg => {
         const params = { Bucket: bucket, Key: key, Body: body };
         beforeEach(() => {
@@ -137,7 +137,9 @@ describe('MultipleBackend put object based on bucket ' +
             });
         });
 
-        it('should put an object to mem with no location header', done => {
+        // SKIP because not mem location constraint in E2E.
+        itSkipIfE2E('should put an object to mem with no location header',
+        done => {
             process.stdout.write('Creating bucket\n');
             return s3.createBucket({ Bucket: bucket,
                 CreateBucketConfiguration: {

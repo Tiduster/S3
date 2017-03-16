@@ -12,7 +12,7 @@ const headers = {};
 const authInfo = makeAuthInfo('accessKey1');
 
 const normalBehaviorLocationConstraint = 'scality-us-west-1';
-const specialBehaviorLocationConstraint = 'scality-us-east-1';
+const specialBehaviorLocationConstraint = 'us-east-1';
 
 describe('bucket creation', () => {
     it('should create a bucket', done => {

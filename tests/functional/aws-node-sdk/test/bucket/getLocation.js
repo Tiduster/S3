@@ -105,7 +105,7 @@ describeSkipAWS('GET bucket location ', () => {
                 {
                     Bucket: bucketName,
                     CreateBucketConfiguration: {
-                        LocationConstraint: 'scality-us-east-1',
+                        LocationConstraint: 'us-east-1',
                     },
                 }, done));
             after(() => bucketUtil.deleteOne(bucketName));

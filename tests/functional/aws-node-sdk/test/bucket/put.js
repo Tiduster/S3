@@ -9,6 +9,7 @@ import configOfficial from '../../../../../lib/Config';
 const bucketName = 'bucketlocation';
 
 const describeSkipAWS = process.env.AWS_ON_AIR ? describe.skip : describe;
+const itSkipIfE2E = process.env.S3_END_TO_END ? it.skip : it;
 
 const locationConstraints = configOfficial.locationConstraints;
 
@@ -50,8 +51,10 @@ describe('PUT Bucket - AWS.S3.createBucket', () => {
               done));
             // AWS JS SDK sends a request with locationConstraint us-east-1 if
             // no locationConstraint provided.
-            it('should return a 200 if no locationConstraints provided.',
-            done => {
+            // Skip this test on E2E because it is making the asumption that the
+            // default region is us-east-1 which is not the case for the E2E
+            itSkipIfE2E('should return a 200 if no locationConstraints ' +
+            'provided.', done => {
                 bucketUtil.s3.createBucket({ Bucket: bucketName }, done);
             });
             it('should return a 200 if us-east behavior', done => {
