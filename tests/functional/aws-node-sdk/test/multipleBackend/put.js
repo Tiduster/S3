@@ -63,7 +63,7 @@ describe('MultipleBackend put object', () => {
                 });
             });
 
-            // SKIP because not mem location constraint in E2E.
+            // SKIP because no mem location constraint in E2E.
             itSkipIfE2E('should put an object to mem', done => {
                 const params = { Bucket: bucket, Key: key,
                     Body: body,
@@ -81,7 +81,8 @@ describe('MultipleBackend put object', () => {
                 });
             });
 
-            it('should put a 0-byte object to mem', done => {
+            // SKIP because no mem location constraint in E2E.
+            itSkipIfE2E('should put a 0-byte object to mem', done => {
                 const params = { Bucket: bucket, Key: key,
                     Metadata: { 'scal-location-constraint': 'mem' },
                 };
@@ -96,6 +97,7 @@ describe('MultipleBackend put object', () => {
                 });
             });
 
+            // SKIP because no file location constraint in E2E.
             itSkipIfE2E('should put an object to file', done => {
                 const params = { Bucket: bucket, Key: key,
                     Body: body,
@@ -137,7 +139,7 @@ describe('MultipleBackend put object based on bucket location', () => {
             });
         });
 
-        // SKIP because not mem location constraint in E2E.
+        // SKIP because no mem location constraint in E2E.
         itSkipIfE2E('should put an object to mem with no location header',
         done => {
             process.stdout.write('Creating bucket\n');
@@ -161,7 +163,9 @@ describe('MultipleBackend put object based on bucket location', () => {
             });
         });
 
-        it('should put an object to file with no location header', done => {
+        // SKIP because no file location constraint in E2E.
+        itSkipIfE2E('should put an object to file with no location header',
+        done => {
             process.stdout.write('Creating bucket\n');
             return s3.createBucket({ Bucket: bucket,
                 CreateBucketConfiguration: {

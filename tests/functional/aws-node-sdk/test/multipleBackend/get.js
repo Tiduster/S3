@@ -8,6 +8,7 @@ const fileObject = 'fileobject';
 const emptyObject = 'emptyObject';
 const body = Buffer.from('I am a body', 'utf8');
 const correctMD5 = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
+const describeSkipIfE2E = process.env.S3_END_TO_END ? describe.skip : describe;
 
 describe('Multiple backend get object', () => {
     withV4(sigCfg => {
@@ -57,7 +58,8 @@ describe('Multiple backend get object', () => {
                 });
             });
 
-        describe('with objects in all available backends ' +
+        // SKIP because no mem or file location constraint in E2E.
+        describeSkipIfE2E('with objects in all available backends ' +
             '(mem/file)', () => {
             before(() => {
                 process.stdout.write('Putting object to mem');
